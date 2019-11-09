@@ -1,0 +1,25 @@
+---
+version: '3.7'
+
+services:
+  traefik:
+    image: traefik:2.0
+    container_name: traefik
+    restart: always
+    env_file:
+      - /etc/default/traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/traefik.toml:/etc/traefik/traefik.toml
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external:
+      name: traefik
