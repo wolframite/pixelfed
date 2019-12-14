@@ -101,7 +101,7 @@
 									<span class="pl-4" v-if="owner && user.hasOwnProperty('id')">
 										<a class="btn btn-outline-secondary btn-sm" href="/settings/home" style="font-weight: 600;">Edit Profile</a>
 									</span>
-									<span class="pl-4" v-else>
+									<span class="pl-4">
 										<a class="fas fa-ellipsis-h fa-lg text-muted text-decoration-none" href="#" @click.prevent="visitorMenu"></a>
 									</span> 
 								</div>
@@ -164,7 +164,7 @@
 				<div class="profile-timeline mt-md-4">
 					<div class="row" v-if="mode == 'grid'">
 						<div class="col-4 p-1 p-md-3" v-for="(s, index) in timeline">
-							<a class="card info-overlay card-md-border-0" :href="s.url">
+							<a class="card info-overlay card-md-border-0" :href="statusUrl(s)">
 								<div :class="[s.sensitive ? 'square' : 'square ' + s.media_attachments[0].filter_class]">
 									<span v-if="s.pf_type == 'photo:album'" class="float-right mr-3 post-icon"><i class="fas fa-images fa-2x"></i></span>
 									<span v-if="s.pf_type == 'video'" class="float-right mr-3 post-icon"><i class="fas fa-video fa-2x"></i></span>
@@ -329,7 +329,7 @@
 						  :gutter="{default: '5px'}"
 						>
 							<div class="p-1" v-for="(s, index) in timeline">
-								<a :class="[s.sensitive ? 'card info-overlay card-md-border-0' : s.media_attachments[0].filter_class + ' card info-overlay card-md-border-0']" :href="s.url">
+								<a :class="[s.sensitive ? 'card info-overlay card-md-border-0' : s.media_attachments[0].filter_class + ' card info-overlay card-md-border-0']" :href="statusUrl(s)">
 									<img :src="previewUrl(s)" class="img-fluid w-100">
 								</a>
 							</div>
@@ -422,6 +422,9 @@
 			<div class="list-group-item cursor-pointer text-center rounded text-dark" @click="copyProfileLink">
 				Copy Link
 			</div>
+			<div v-if="profile.locked == false" class="list-group-item cursor-pointer text-center rounded text-dark" @click="showEmbedProfileModal">
+				Embed
+			</div>
 			<div v-if="user && !owner && !relationship.following" class="list-group-item cursor-pointer text-center rounded text-dark" @click="followProfile">
 				Follow
 			</div>
@@ -471,6 +474,21 @@
 			</p>
 		</div>
 	</b-modal>
+	<b-modal ref="embedModal"
+	id="ctx-embed-modal"
+	hide-header
+	hide-footer
+	centered
+	rounded
+	size="md"
+	body-class="p-2 rounded">
+	<div>
+		<textarea class="form-control disabled" rows="1" style="border: 1px solid #efefef; font-size: 14px; line-height: 12px; height: 37px; margin: 0 0 7px; resize: none; white-space: nowrap;" v-model="ctxEmbedPayload"></textarea>
+		<hr>
+		<button :class="copiedEmbed ? 'btn btn-primary btn-block btn-sm py-1 font-weight-bold disabed': 'btn btn-primary btn-block btn-sm py-1 font-weight-bold'" @click="ctxCopyEmbed" :disabled="copiedEmbed">{{copiedEmbed ? 'Embed Code Copied!' : 'Copy Embed Code'}}</button>
+		<p class="mb-0 px-2 small text-muted">By using this embed, you agree to our <a href="/site/terms">Terms of Use</a></p>
+	</div>
+</b-modal>
 </div>
 </template>
 <style type="text/css" scoped>
@@ -545,7 +563,9 @@
 				bookmarksPage: 2,
 				collections: [],
 				collectionsPage: 2,
-				isMobile: false
+				isMobile: false,
+				ctxEmbedPayload: null,
+				copiedEmbed: false
 			}
 		},
 		beforeMount() {
@@ -1080,7 +1100,38 @@
 
 			formatCount(count) {
 				return App.util.format.count(count);
-			}
+			},
+
+			statusUrl(status) {
+				return status.url;
+
+				if(status.local == true) {
+					return status.url;
+				}
+
+				return '/i/web/post/_/' + status.account.id + '/' + status.id;
+			},
+
+			profileUrl(status) {
+				return status.url;
+
+				if(status.local == true) {
+					return status.account.url;
+				}
+
+				return '/i/web/profile/_/' + status.account.id;
+			},
+
+			showEmbedProfileModal() {
+				this.ctxEmbedPayload = window.App.util.embed.profile(this.profile.url)
+				this.$refs.embedModal.show();
+			},
+
+			ctxCopyEmbed() {
+				navigator.clipboard.writeText(this.ctxEmbedPayload);
+				this.$refs.embedModal.hide();
+				this.$refs.visitorContextMenu.hide();
+			},
 		}
 	}
 </script>

@@ -16,23 +16,59 @@ if (token) {
 
 window.App = window.App || {};
 
+window.App.redirect = function() {
+	document.querySelectorAll('a').forEach(function(i,k) { 
+		let a = i.getAttribute('href');
+		if(a && a.length > 5 && a.startsWith('https://')) {
+			let url = new URL(a);
+			if(url.host !== window.location.host && url.pathname !== '/i/redirect') {
+				i.setAttribute('href', '/i/redirect?url=' + encodeURIComponent(a));
+			}
+		}
+	});
+}
+
 window.App.boot = function() {
 	new Vue({ el: '#content'});
 }
 
 window.App.util = {
+	compose: {
+		post: (function() {
+			let path = window.location.pathname;
+			let whitelist = [
+				'/',
+				'/timeline/public'
+			];
+			if(whitelist.includes(path)) {
+				$('#composeModal').modal('show');
+			} else {
+				window.location.href = '/?a=co';
+			}
+		}),
+		circle: (function() {
+			console.log('Unsupported method.');
+		}),
+		collection: (function() {
+			console.log('Unsupported method.');
+		}),
+		loop: (function() {
+			console.log('Unsupported method.');
+		}),
+		story: (function() {
+			console.log('Unsupported method.');
+		}),
+	},
 	time: (function() { 
 		return new Date; 
 	}),
-	version: (function() {
-		return 1;
-	}),
+	version: 1,
 	format: {
-		count: (function(count = 0) {
+		count: (function(count = 0, locale = 'en-GB', notation = 'compact') {
 			if(count < 1) {
 				return 0;
 			}
-			return new Intl.NumberFormat('en-GB', { notation: "compact" , compactDisplay: "short" }).format(count);
+			return new Intl.NumberFormat(locale, { notation: notation , compactDisplay: "short" }).format(count);
 		})
 	}, 
 	filters: [
@@ -77,6 +113,21 @@ window.App.util = {
 			['Walden','filter-walden'], 
 			['Willow','filter-willow'], 
 			['X-Pro II','filter-xpro-ii']
-		],
-		emoji: ['😂','💯','❤️','🙌','👏','👌','😍','😯','😢','😅','😁','🙂','😎','😀','🤣','😃','😄','😆','😉','😊','😋','😘','😗','😙','😚','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🙁','😖','😞','😟','😤','😭','😦','😧','😨','😩','🤯','😬','😰','😱','😳','🤪','😵','😡','😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🤠','🤡','🤥','🤫','🤭','🧐','🤓','😈','👿','👹','👺','💀','👻','👽','🤖','💩','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🤲','👐','🤝','👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘','👈','👉','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤙','💪','🖕','✍️','🙏','💍','💄','💋','👄','👅','👂','👃','👣','👁','👀','🧠','🗣','👤','👥'],
+	],
+	emoji: ['😂','💯','❤️','🙌','👏','👌','😍','😯','😢','😅','😁','🙂','😎','😀','🤣','😃','😄','😆','😉','😊','😋','😘','😗','😙','😚','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🙁','😖','😞','😟','😤','😭','😦','😧','😨','😩','🤯','😬','😰','😱','😳','🤪','😵','😡','😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🤠','🤡','🤥','🤫','🤭','🧐','🤓','😈','👿','👹','👺','💀','👻','👽','🤖','💩','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🤲','👐','🤝','👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘','👈','👉','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤙','💪','🖕','✍️','🙏','💍','💄','💋','👄','👅','👂','👃','👣','👁','👀','🧠','🗣','👤','👥'
+	],
+	embed: {
+		post: (function(url, caption = true, likes = false, layout = 'full') {
+			let u = url + '/embed?';
+			u += caption ? 'caption=true&' : 'caption=false&';
+			u += likes ? 'likes=true&' : 'likes=false&';
+			u += layout == 'compact' ? 'layout=compact' : 'layout=full';
+			return '<iframe src="'+u+'" class="pixelfed__embed" style="max-width: 100%; border: 0" width="400" allowfullscreen="allowfullscreen"></iframe><script async defer src="'+window.location.origin +'/embed.js"><\/script>';
+		}),
+		profile: (function(url) {
+			let u = url + '/embed';
+			return '<iframe src="'+u+'" class="pixelfed__embed" style="max-width: 100%; border: 0" width="400" allowfullscreen="allowfullscreen"></iframe><script async defer src="'+window.location.origin +'/embed.js"><\/script>';
+		})
+	}
+
 };

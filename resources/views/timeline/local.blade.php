@@ -2,7 +2,7 @@
 
 @section('content')
 
-<timeline scope="local"></timeline>
+<timeline scope="local" layout="feed"></timeline>
 
 @endsection
 

@@ -15,9 +15,16 @@
 					</p>
 					<p v-if="owner == true" class="pt-3 text-center">
 						<span>
-							<button class="btn btn-outline-light btn-sm" @click.prevent="addToCollection">Add Photo</button>
+							<button class="btn btn-outline-light btn-sm" @click.prevent="addToCollection" onclick="this.blur();">
+								<span v-if="loadingPostList == false">Add Photo</span>
+								<span v-else class="px-4">
+									<div class="spinner-border spinner-border-sm" role="status">
+									  <span class="sr-only">Loading...</span>
+									</div>
+								</span>
+							</button>
 							 &nbsp; &nbsp; 
-							<button class="btn btn-outline-light btn-sm" @click.prevent="editCollection">Edit</button>
+							<button class="btn btn-outline-light btn-sm" @click.prevent="editCollection" onclick="this.blur();">Edit</button>
 							 &nbsp; &nbsp; 
 							<button class="btn btn-outline-light btn-sm" @click.prevent="deleteCollection">Delete</button>
 						</span>
@@ -59,18 +66,59 @@
 					<option value="private">Followers Only</option>
 				</select>
 			</div>
-			<button type="button" class="btn btn-primary btn-sm py-1 font-weight-bold px-3 float-right" @click.prevent="updateCollection">Save</button>
+			<div class="d-flex justify-content-between align-items-center pt-3">
+				<a class="text-primary font-weight-bold text-decoration-none" href="#" @click.prevent="showEditPhotosModal">Edit Photos</a>
+				<button type="button" class="btn btn-primary btn-sm py-1 font-weight-bold px-3 float-right" @click.prevent="updateCollection">Save</button>
+			</div>
 		</form>
 	</b-modal>
-	<b-modal ref="addPhotoModal" id="add-photo-modal" hide-footer centered title="Add Photo" body-class="">
+	<b-modal ref="addPhotoModal" id="add-photo-modal" hide-footer centered title="Add Photo" body-class="m-3">
+		<div class="form-group">
+			<label for="title" class="font-weight-bold text-muted">Add Recent Post</label>
+			<div class="row m-1" v-if="postsList.length > 0">
+				<div v-for="(p, index) in postsList" :key="'postList-'+index" class="col-4 p-1 cursor-pointer" @click="addRecentId(p)">
+					<div class="square">
+						<div class="square-content" v-bind:style="'background-image: url(' + p.media_attachments[0].url + ');'"></div>
+					</div>
+				</div>
+				<div class="col-12">
+					<hr>
+				</div>
+			</div>
+		</div>
 		<form>
 			<div class="form-group">
 				<label for="title" class="font-weight-bold text-muted">Add Post by URL</label>
 				<input type="text" class="form-control" placeholder="https://pixelfed.dev/p/admin/1" v-model="photoId">
 				<p class="help-text small text-muted">Only local, public posts can be added</p>
 			</div>
-			<button type="button" class="btn btn-primary btn-sm py-1 font-weight-bold px-3 float-right" @click.prevent="pushId">Add Photo</button>
+			<button type="button" class="btn btn-primary btn-sm py-1 font-weight-bold px-3 float-right" @click.prevent="pushId">
+				<span v-if="addingPostToCollection" class="px-4">
+					<div class="spinner-border spinner-border-sm" role="status">
+						<span class="sr-only">Loading...</span>
+					</div>
+				</span>
+				<span v-else>
+					Add Photo
+				</span>
+			</button>
 		</form>
+	</b-modal>
+	<b-modal ref="editPhotosModal" id="edit-photos-modal" hide-footer centered title="Edit Collection Photos" body-class="m-3">
+		<div class="form-group">
+			<p class="font-weight-bold text-dark text-center">Select a Photo to Delete</p>
+			<div class="row m-1 scrollbar-hidden" v-if="posts.length > 0" style="max-height: 350px;overflow-y: auto;">
+				<div v-for="(p, index) in posts" :key="'plm-'+index" class="col-4 p-1 cursor-pointer">
+					<div :class="[markedForDeletion.indexOf(p.id) == -1 ? 'square' : 'square  delete-border']" @click="markPhotoForDeletion(p.id)">
+						<div class="square-content" v-bind:style="'background-image: url(' + p.media_attachments[0].url + ');'"></div>
+					</div>
+				</div>
+			</div>
+			<div v-show="markedForDeletion.length > 0">
+				<button type="button" @click.prevent="confirmDeletion" class="btn btn-primary font-weight-bold py-0 btn-block mb-0 mt-4">Delete {{markedForDeletion.length}} {{markedForDeletion.length == 1 ? 'photo':'photos'}}</button>
+			</div>
+		</div>
+
 	</b-modal>
 </div>
 </template>
@@ -84,6 +132,16 @@
 		left: 0;
 		background: rgba(0,0,0,.68);
 		z-index: 300;
+	}
+	.scrollbar-hidden::-webkit-scrollbar {
+		display: none;
+	}
+	.delete-border {
+		border: 4px solid #ff0000;
+	}
+	.delete-border .square-content {
+		background-color: red;
+		background-blend-mode: screen;
 	}
 </style>
 
@@ -105,12 +163,17 @@ export default {
 		return {
 			loaded: false,
 			posts: [],
+			ids: [],
 			currentUser: false,
 			owner: false,
 			title: this.collectionTitle,
 			description: this.collectionDescription,
 			visibility: this.collectionVisibility,
-			photoId: ''
+			photoId: '',
+			postsList: [],
+			loadingPostList: false,
+			addingPostToCollection: false,
+			markedForDeletion: []
 		}
 	},
 
@@ -135,6 +198,9 @@ export default {
 			axios.get('/api/local/collection/items/' + this.collectionId)
 			.then(res => {
 				this.posts = res.data;
+				this.ids = this.posts.map(p => {
+					return p.id;
+				});
 				this.loaded = true;
 			});
 		},
@@ -149,11 +215,35 @@ export default {
 		},
 
 		addToCollection() {
-			this.$refs.addPhotoModal.show();
+			let self = this;
+			this.loadingPostList = true;
+			if(this.postsList.length == 0) {
+				axios.get('/api/pixelfed/v1/accounts/'+this.profileId+'/statuses', {
+					params: {
+						min_id: 1,
+						limit: 13
+					}
+				})
+				.then(res => {
+					self.postsList = res.data.filter(l => {
+						return self.ids.indexOf(l.id) == -1;
+					}).splice(0,9);
+					self.loadingPostList = false;
+					self.$refs.addPhotoModal.show();
+				}).catch(err => {
+					self.loadingPostList = false;
+					swal('An Error Occured', 'We cannot process your request at this time, please try again later.', 'error');
+				})
+			} else {
+				this.$refs.addPhotoModal.show();
+				this.loadingPostList = false;
+			}
 		},
 
 		pushId() {
 			let max = 18;
+			let addingPostToCollection = true;
+			let self = this;
 			if(this.posts.length >= max) {
 				swal('Error', 'You can only add ' + max + ' posts per collection', 'error');
 				return;
@@ -174,11 +264,13 @@ export default {
 				collection_id: this.collectionId,
 				post_id: split[5]
 			}).then(res => {
-				location.reload();
+				self.ids.push(...split[5]);
 			}).catch(err => {
 				swal('Invalid URL', 'The post you entered was invalid', 'error');
 				this.photoId = '';
 			});
+			self.$refs.addPhotoModal.hide();
+			window.location.reload();
 		},
 
 		editCollection() {
@@ -210,7 +302,66 @@ export default {
 			}).then(res => {
 				console.log(res.data);
 			});
-		}
+		},
+
+		showEditPhotosModal() {
+			this.$refs.editModal.hide();
+			this.$refs.editPhotosModal.show();
+		},
+
+		markPhotoForDeletion(id) {
+			this.markedForDeletion.indexOf(id) == -1 ?
+			this.markedForDeletion.push(id) :
+			this.markedForDeletion = this.markedForDeletion.filter(d => {
+				return d != id;
+			});
+		},
+
+		confirmDeletion() {
+			let self = this;
+			let confirmed = window.confirm('Are you sure you want to delete this?');
+			if(confirmed) {
+				this.markedForDeletion.forEach(mfd => {
+					axios.delete('/api/local/collection/item', {
+						params: {
+							collection_id: self.collectionId,
+							post_id: mfd
+						}
+					})
+					.then(res => {
+						self.removeItem(mfd);
+						this.$refs.editPhotosModal.hide();
+					})
+					.catch(err => {
+						swal(
+							'Oops!',
+							'An error occured with your request, please try again later.',
+							'error'
+						);
+					})
+				});
+				this.markedForDeletion = [];
+			}
+		},
+
+		removeItem(id) {
+			this.posts = this.posts.filter(post => {
+				return post.id != id;
+			});
+		},
+
+		addRecentId(post) {
+			let self = this;
+			axios.post('/api/local/collection/item', {
+				collection_id: self.collectionId,
+				post_id: post.id
+			}).then(res => {
+				window.location.reload();
+			}).catch(err => {
+				swal('Oops!', 'An error occured, please try selecting another post.', 'error');
+				this.photoId = '';
+			});
+		}		
 	}
 }
 </script>
